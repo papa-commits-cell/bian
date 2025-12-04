@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binance Alpha V45 [15m报警增强版]</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { bg: '#0b0e11', panel: '#161a1e', border: '#2b3139', text: '#eaecef', subtext: '#848e9c', up: '#0ecb81', down: '#f6465d', highlight: '#f0b90b', accent: '#3b82f6' },
+                    fontFamily: { mono: ['"JetBrains Mono"', 'monospace'], sans: ['Inter', 'sans-serif'] },
+                    fontSize: { 'xxs': '0.65rem' }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Inter:wght@400;600&display=swap');
+        body { background-color: #0b0e11; color: #eaecef; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        th { position: sticky; top: 0; background: #161a1e; z-index: 10; padding: 8px; font-size: 11px; text-align: right; color: #848e9c; cursor: pointer; border-bottom: 1px solid #2b3139; transition: color 0.2s; }
+        th:hover { color: #f0b90b; background: #20252b; }
+        th.active-sort { color: #f0b90b; font-weight: bold; border-bottom: 2px solid #f0b90b; }
+        td { padding: 6px 8px; border-bottom: 1px solid #1e2329; font-size: 12px; white-space: nowrap; }
+        tr:hover { background-color: #2b3139; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #474d57; border-radius: 2px; }
+        .input-dark { background: #0b0e11; border: 1px solid #2b3139; color: #eaecef; padding: 4px 2px; font-size: 12px; border-radius: 3px; width: 100%; transition: border 0.2s; text-align: center; font-weight: bold; }
+        .input-dark:focus { border-color: #f0b90b; outline: none; background: #1e2329; }
+        .input-highlight { border-color: #f0b90b; color: #f0b90b; background: rgba(240, 185, 11, 0.05); }
+        .input-highlight:focus { background: rgba(240, 185, 11, 0.1); box-shadow: 0 0 5px rgba(240, 185, 11, 0.3); }
+        .toggle-checkbox:checked { right: 0; border-color: #f0b90b; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #f0b90b; }
+        .coin-link:hover { color: #f0b90b; text-decoration: underline; }
+        .dimmed { opacity: 0.3; filter: grayscale(100%); transition: opacity 0.5s; }
+        .highlight-lock { background-color: rgba(240, 185, 11, 0.15) !important; border-left: 4px solid #f0b90b !important; opacity: 1 !important; filter: none !important; }
+        .pinned-row { background-color: rgba(59, 130, 246, 0.1) !important; border-left: 4px solid #3b82f6 !important; }
+        .param-group { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; border: 1px solid #2b3139; white-space: nowrap; }
+        .param-label { font-size: 0.7rem; color: #848e9c; text-transform: uppercase; font-weight: 600; }
+        .buy-ratio-bg { background: #2b3139; height: 4px; width: 40px; display: inline-block; border-radius: 2px; overflow: hidden; vertical-align: middle; }
+        .buy-ratio-fill { height: 100%; transition: width 0.3s; }
+        .pin-btn:hover { color: #f0b90b; transform: scale(1.1); }
+    </style>
+</head>
+<body class="h-screen flex flex-col select-none">
+
+    <header class="h-16 bg-panel border-b border-border flex items-center px-4 justify-between shrink-0 z-20 shadow-lg">
+        <div class="flex items-center gap-6 overflow-x-auto no-scrollbar w-full mr-4">
+            <div class="flex items-center gap-2 mr-2 shrink-0">
+                <i class="fas fa-bell text-highlight text-lg"></i>
+                <h1 class="font-bold text-base tracking-wider font-mono hidden lg:block">ALPHA<span class="text-highlight">V45</span></h1>
+            </div>
+            
+            <div class="flex gap-3">
+                <div class="param-group" title="只监控涨跌幅最大的前N个币">
+                    <span class="param-label">Top N</span>
+                    <input type="number" id="cfg-limit" value="450" min="10" max="1000" class="input-dark w-16 text-highlight text-sm" onchange="app.saveSettings()">
+                </div>
+                <div class="param-group" title="每轮扫描后的休息时间">
+                    <span class="param-label">间隔(s)</span>
+                    <input type="number" id="cfg-interval" value="3" min="0" max="60" class="input-dark w-16 text-white text-sm" onchange="app.saveSettings()">
+                </div>
+                <div class="param-group" title="每次并发请求的数量">
+                    <span class="param-label">吞吐量</span>
+                    <input type="number" id="cfg-batch" value="30" min="5" max="100" class="input-dark w-16 text-accent text-sm" onchange="app.saveSettings()">
+                </div>
+                <div class="param-group" title="警报重复播放次数">
+                    <span class="param-label text-highlight">播报次数</span>
+                    <input type="number" id="cfg-repeat" value="3" min="1" max="20" class="input-dark w-14 text-highlight text-sm text-center font-bold" onchange="app.saveSettings()">
+                </div>
+                <div class="param-group border-l-2 border-l-red-500/50" title="智能跳过：价格不动且无成交量时跳过N次">
+                    <span class="param-label text-red-400">休眠</span>
+                    <input type="number" id="cfg-skip" value="10" min="0" max="50" class="input-dark w-14 text-red-400 text-sm" onchange="app.saveSettings()">
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-3 shrink-0">
+            <div class="text-xxs text-subtext hidden xl:block text-right leading-tight font-mono">
+                <div>LATENCY: <span id="stat-latency" class="text-up">--</span></div>
+                <div>SKIPPED: <span id="stat-skipped" class="text-gray-500">0</span></div>
+            </div>
+            
+            <div id="status-badge" class="px-3 py-1 bg-red-900/30 border border-red-700 rounded text-xs text-red-500 font-mono uppercase font-bold">STOPPED</div>
+            
+            <button id="btn-reset" class="bg-gray-700 hover:bg-red-600 text-white font-bold px-3 py-1.5 rounded text-sm flex items-center gap-2 transition-all shadow-lg" title="清空所有数据重新扫描">
+                <i class="fas fa-trash-can"></i>
+            </button>
+
+            <button id="btn-toggle" class="bg-highlight hover:bg-yellow-400 text-black font-bold px-6 py-1.5 rounded text-sm flex items-center gap-2 transition-all active:scale-95 shadow-lg">
+                <i class="fas fa-play"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        <aside class="w-64 bg-panel border-r border-border flex flex-col shrink-0 z-10">
+            <div class="p-4 border-b border-border space-y-5 overflow-y-auto">
+                <div class="border-l-2 border-l-gray-600 pl-3">
+                    <div class="text-xs text-gray-400 font-bold mb-3 uppercase tracking-wide">警报筛选 (FILTERS)</div>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="text-xxs text-subtext block mb-1">1m %</label>
+                                <input type="number" id="cfg-chg1" value="2" step="0.1" class="input-dark bg-opacity-20" onchange="app.saveSettings()">
+                            </div>
+                            <div>
+                                <label class="text-xxs text-subtext block mb-1">3m %</label>
+                                <input type="number" id="cfg-chg3" value="6" step="0.1" class="input-dark bg-opacity-20" onchange="app.saveSettings()">
+                            </div>
+                            <div>
+                                <label class="text-xxs text-highlight font-bold block mb-1">15m %</label>
+                                <input type="number" id="cfg-chg15" value="10" step="0.5" class="input-dark input-highlight" onchange="app.saveSettings()">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xxs text-highlight font-bold block mb-1">Min 1m额(K)</label>
+                                <input type="number" id="cfg-vol" value="0.5" class="input-dark input-highlight text-right" title="0.5 = 500U" onchange="app.saveSettings()">
+                            </div>
+                            <div>
+                                <label class="text-xxs text-subtext block mb-1">Min 笔数</label>
+                                <input type="number" id="cfg-trades" value="3" class="input-dark bg-opacity-20 text-right" onchange="app.saveSettings()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between mt-2">
+                    <span class="text-xs text-gray-400">只看涨 (No Dump)</span>
+                    <input type="checkbox" id="cfg-only-up" class="accent-highlight" checked onchange="app.saveSettings()">
+                </div>
+
+                <div>
+                    <label class="text-xxs text-subtext block mb-1">黑名单 (CSV)</label>
+                    <input type="text" id="cfg-black" value="USDC,FDUSD,TUSD" class="input-dark text-down bg-opacity-20" onchange="app.saveSettings()">
+                </div>
+            </div>
+
+            <div class="flex-1 flex flex-col overflow-hidden bg-[#0d1117] border-t border-border">
+                <div class="px-3 py-2 bg-[#161a1e] border-b border-border flex justify-between items-center">
+                    <span class="text-xxs font-mono text-subtext font-bold">⚡ ALERT FEED</span>
+                    <button id="clear-logs" class="text-xxs text-subtext hover:text-white transition"><i class="fas fa-trash"></i></button>
+                </div>
+                <div id="console-logs" class="flex-1 overflow-y-auto p-2 space-y-2 font-mono text-xxs text-gray-400"></div>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col bg-bg relative">
+            <div id="scan-progress" class="h-0.5 bg-gray-800 w-full relative hidden">
+                <div id="progress-bar" class="absolute h-full bg-highlight w-0 transition-all duration-100 ease-linear"></div>
+            </div>
+            
+            <div class="flex-1 overflow-auto">
+                <table class="w-full text-right border-collapse">
+                    <thead>
+                        <tr>
+                            <th class="text-left w-32 pl-4">币种 (Pin/Link)</th>
+                            <th onclick="app.sort('p')">价格</th>
+                            <th onclick="app.sort('c1')">1m</th>
+                            <th onclick="app.sort('c3')">3m</th>
+                            <th onclick="app.sort('c15')" class="text-highlight">15m</th>
+                            <th onclick="app.sort('r')">买盘%</th>
+                            <th onclick="app.sort('v1')" id="th-v1" class="text-highlight">1m $</th>
+                            <th onclick="app.sort('v5')" id="th-v5" class="text-subtext active-sort">5m $</th>
+                            <th onclick="app.sort('n')">笔数</th>
+                        </tr>
+                    </thead>
+                    <tbody id="market-body"></tbody>
+                </table>
+                <div id="empty-state" class="hidden flex flex-col items-center justify-center h-64 text-subtext opacity-50">
+                    <i class="fas fa-chart-line text-4xl mb-4"></i><p class="text-xs">SYSTEM READY</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE = 'https://www.binance.com/bapi/defi/v1/public';
+
+        class SoundSystem {
+            constructor() {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.enabled = false;
+            }
+            activate() { if (this.ctx.state === 'suspended') this.ctx.resume(); this.enabled = true; }
+            playTone(type) {
+                if (!this.enabled) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const now = this.ctx.currentTime;
+                if (type === 'pump') { 
+                    osc.type = 'square'; osc.frequency.setValueAtTime(1000, now);
+                    osc.frequency.linearRampToValueAtTime(1500, now + 0.15); gain.gain.setValueAtTime(0.2, now);
+                    osc.start(); osc.stop(now + 0.2);
+                }
+                osc.connect(gain); gain.connect(this.ctx.destination);
+            }
+            speak(symbol, text) {
+                if (!this.enabled) return;
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(symbol + "，" + text);
+                u.lang = 'zh-CN'; u.rate = 1.5; u.volume = 1.0;
+                window.speechSynthesis.speak(u);
+            }
+            trigger(type, symbol, msg, count) {
+                if (!this.enabled) return;
+                this.playTone(type);
+                this.speak(symbol, msg);
+                if (count > 1) {
+                    for (let i = 1; i < count; i++) {
+                        setTimeout(() => {
+                            this.playTone(type);
+                            this.speak(symbol, msg);
+                        }, i * 3000);
+                    }
+                }
+            }
+        }
+
+        class Terminal {
+            constructor() {
+                this.tokens = new Map();
+                this.pairMap = new Map();
+                this.audio = new SoundSystem();
+                this.isRunning = false;
+                this.timer = null;
+                this.sortKey = 'v5';
+                this.sortDir = -1;
+                this.skippedCount = 0;
+                this.pinnedIds = new Set();
+                this.lastRenderList = [];
+                
+                this.dom = {
+                    btn: document.getElementById('btn-toggle'),
+                    reset: document.getElementById('btn-reset'),
+                    badge: document.getElementById('status-badge'),
+                    body: document.getElementById('market-body'),
+                    logs: document.getElementById('console-logs'),
+                    prog: document.getElementById('scan-progress'),
+                    bar: document.getElementById('progress-bar'),
+                    empty: document.getElementById('empty-state'),
+                    lat: document.getElementById('stat-latency'),
+                    skp: document.getElementById('stat-skipped')
+                };
+
+                this.loadSettings();
+            }
+
+            loadSettings() {
+                const saved = localStorage.getItem('alpha_cfg_v3'); // 更新到 V3 版本
+                if (saved) {
+                    const cfg = JSON.parse(saved);
+                    for (const [id, val] of Object.entries(cfg.inputs || {})) {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            if (el.type === 'checkbox') el.checked = val;
+                            else el.value = val;
+                        }
+                    }
+                    if (cfg.pinned) this.pinnedIds = new Set(cfg.pinned);
+                }
+            }
+
+            saveSettings() {
+                const ids = ['cfg-limit', 'cfg-interval', 'cfg-batch', 'cfg-repeat', 'cfg-skip', 
+                             'cfg-chg1', 'cfg-chg3', 'cfg-chg15', 'cfg-vol', 'cfg-trades', 'cfg-black', 'cfg-only-up'];
+                const inputs = {};
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) inputs[id] = el.type === 'checkbox' ? el.checked : el.value;
+                });
+                const cfg = { inputs: inputs, pinned: Array.from(this.pinnedIds) };
+                localStorage.setItem('alpha_cfg_v3', JSON.stringify(cfg));
+            }
+
+            togglePin(alphaId) {
+                if (this.pinnedIds.has(alphaId)) this.pinnedIds.delete(alphaId);
+                else this.pinnedIds.add(alphaId);
+                this.saveSettings();
+                
+                if (this.lastRenderList.length > 0) {
+                    this.lastRenderList.forEach(t => t.isPinned = this.pinnedIds.has(t.meta.alphaId));
+                    this.render(this.lastRenderList);
+                }
+            }
+
+            resetData() {
+                this.tokens.clear();
+                this.dom.body.innerHTML = '';
+                this.dom.logs.innerHTML = '';
+                this.skippedCount = 0;
+                this.dom.skp.innerText = '0';
+                this.dom.lat.innerText = '--';
+                if (this.isRunning) {
+                    this.pairMap.clear(); 
+                    this.initExchangeInfo();
+                }
+                const icon = this.dom.reset.querySelector('i');
+                icon.className = 'fas fa-check text-green-400';
+                setTimeout(() => icon.className = 'fas fa-trash-can', 1000);
+            }
+
+            toggle() {
+                this.isRunning = !this.isRunning;
+                if (this.isRunning) {
+                    this.audio.activate();
+                    this.updateUI(true);
+                    this.dom.prog.classList.remove('hidden');
+                    this.dom.empty.classList.add('hidden');
+                    if (this.pairMap.size === 0) this.initExchangeInfo();
+                    else this.loop();
+                } else {
+                    this.updateUI(false);
+                    this.dom.prog.classList.add('hidden');
+                    this.dom.empty.classList.remove('hidden');
+                    clearTimeout(this.timer);
+                }
+            }
+
+            updateUI(running) {
+                this.dom.btn.innerHTML = running ? '<i class="fas fa-stop"></i>' : '<i class="fas fa-play"></i>';
+                this.dom.btn.className = running ? "bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-1.5 rounded text-sm flex items-center gap-2" : "bg-highlight hover:bg-yellow-400 text-black font-bold px-6 py-1.5 rounded text-sm flex items-center gap-2";
+                this.dom.badge.innerText = running ? "ON" : "OFF";
+                this.dom.badge.className = running ? "px-3 py-1 bg-green-900/30 border border-green-700 rounded text-xs text-green-500 font-mono font-bold animate-pulse" : "px-3 py-1 bg-red-900/30 border border-red-700 rounded text-xs text-red-500 font-mono font-bold";
+            }
+
+            async initExchangeInfo() {
+                try {
+                    const res = await fetch(`${API_BASE}/alpha-trade/get-exchange-info?_t=${Date.now()}`);
+                    const data = await res.json();
+                    if (data.data?.symbols) {
+                        data.data.symbols.forEach(s => {
+                            if (s.status === 'TRADING' && s.quoteAsset === 'USDT') {
+                                if (!this.pairMap.has(s.baseAsset)) this.pairMap.set(s.baseAsset, []);
+                                this.pairMap.get(s.baseAsset).push(s.symbol);
+                            }
+                        });
+                        this.loop();
+                    }
+                } catch (e) { this.toggle(); }
+            }
+
+            async loop() {
+                if (!this.isRunning) return;
+                const start = Date.now();
+                try {
+                    const res = await fetch(`${API_BASE}/wallet-direct/buw/wallet/cex/alpha/all/token/list?_t=${Date.now()}`);
+                    const json = await res.json();
+                    this.dom.lat.innerText = (Date.now() - start) + "ms";
+                    if (json.data) await this.process(json.data);
+                } catch (e) {}
+                
+                const interval = (parseInt(document.getElementById('cfg-interval').value) || 3) * 1000;
+                this.timer = setTimeout(() => this.loop(), interval);
+            }
+
+            async process(rawData) {
+                const now = Date.now();
+                const validTokens = [];
+                const blackList = document.getElementById('cfg-black').value.toUpperCase().split(',');
+                const scanLimit = parseInt(document.getElementById('cfg-limit').value) || 450;
+
+                rawData.forEach(t => {
+                    let pairs = this.pairMap.get(t.alphaId);
+                    if (!pairs) pairs = [t.symbol + 'USDT']; 
+                    if (!t.price) return; 
+                    if (blackList.includes(t.symbol.toUpperCase())) return;
+
+                    let token = this.tokens.get(t.alphaId);
+                    const price = parseFloat(t.price);
+
+                    if (!token) {
+                        token = {
+                            meta: t, pairs: pairs, history: [],
+                            klineMap: new Map(),
+                            stats: { p: price, c1: 0, c3: 0, c15: 0, v1: 0, v5: 0, n: 0, r: 50 }, 
+                            lastAlert: 0, highlightUntil: 0, skipCounter: 0,
+                            hasFullHistory: false,
+                            isPinned: false
+                        };
+                        this.tokens.set(t.alphaId, token);
+                    }
+
+                    token.history.push({ t: now, p: price });
+                    if (token.history.length > 600) token.history.shift(); 
+                    token.stats.p = price;
+                    token.isPinned = this.pinnedIds.has(t.alphaId);
+
+                    if (!token.hasFullHistory) {
+                        token.stats.c1 = this.calcChg(token.history, now, 60);
+                        token.stats.c3 = this.calcChg(token.history, now, 180);
+                    }
+                    validTokens.push(token);
+                });
+
+                validTokens.sort((a, b) => {
+                    const scoreA = Math.abs(a.stats.c1) * 5 + Math.abs(a.stats.c3);
+                    const scoreB = Math.abs(b.stats.c1) * 5 + Math.abs(b.stats.c3);
+                    return scoreB - scoreA;
+                });
+
+                const targets = [];
+                this.skippedCount = 0;
+
+                for (const t of validTokens) {
+                    if (targets.length >= scanLimit && !t.isPinned) break;
+
+                    const isWakingUp = Math.abs(t.stats.c1) > 0.5;
+                    if (t.isPinned || isWakingUp) {
+                        t.skipCounter = 0;
+                        targets.push(t);
+                    } else {
+                        if (t.skipCounter > 0) {
+                            t.skipCounter--;
+                            this.skippedCount++;
+                        } else {
+                            targets.push(t);
+                        }
+                    }
+                }
+
+                this.dom.skp.innerText = this.skippedCount;
+                await this.fetchKlinesBatch(targets);
+                
+                let displayList = validTokens.slice(0, scanLimit);
+                const pinnedExtras = validTokens.filter(t => t.isPinned && !displayList.includes(t));
+                displayList = [...displayList, ...pinnedExtras];
+                
+                this.render(displayList);
+            }
+
+            async fetchKlinesBatch(targets) {
+                const BATCH_SIZE = parseInt(document.getElementById('cfg-batch').value) || 30; 
+                const SKIP_RESET = parseInt(document.getElementById('cfg-skip').value) || 10;
+                let completed = 0;
+
+                for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+                    if (!this.isRunning) break;
+                    if (i > 0) await new Promise(r => setTimeout(r, 200));
+
+                    const batch = targets.slice(i, i + BATCH_SIZE);
+                    const promises = batch.map(async (token) => {
+                        try {
+                            const limit = token.hasFullHistory ? 5 : 60;
+                            const res = await fetch(`${API_BASE}/alpha-trade/klines?symbol=${token.pairs[0]}&interval=15s&limit=${limit}&_t=${Date.now()}`);
+                            const d = await res.json();
+                            
+                            if (d.data && d.data.length > 0) {
+                                d.data.forEach(k => {
+                                    token.klineMap.set(k[0], { 
+                                        t: k[0], o: parseFloat(k[1]), c: parseFloat(k[4]), 
+                                        v: parseFloat(k[5]), q: parseFloat(k[7]), n: parseInt(k[8]) 
+                                    });
+                                });
+
+                                const expireTime = Date.now() - 16 * 60 * 1000;
+                                for (const [t, _] of token.klineMap) {
+                                    if (t < expireTime) token.klineMap.delete(t);
+                                }
+                                token.hasFullHistory = true;
+                                this.calcStatsFromMap(token);
+                            }
+                        } catch (e) {}
+
+                        if (!token.isPinned && token.stats.v1 === 0 && Math.abs(token.stats.c1) < 0.3) {
+                            token.skipCounter = SKIP_RESET;
+                        }
+                        this.checkAlert(token);
+                    });
+                    await Promise.all(promises);
+                    completed += batch.length;
+                    this.dom.bar.style.width = Math.round((completed / targets.length) * 100) + '%';
+                }
+                setTimeout(() => { this.dom.bar.style.width = '0%'; }, 200);
+            }
+
+            calcStatsFromMap(token) {
+                const now = Date.now();
+                const getOpenAt = (msAgo) => {
+                    const targetTime = now - msAgo;
+                    let closest = null;
+                    let minDiff = Infinity;
+                    for (const [t, k] of token.klineMap) {
+                        const diff = Math.abs(t - targetTime);
+                        if (diff < minDiff && diff < 60000) {
+                            minDiff = diff;
+                            closest = k;
+                        }
+                    }
+                    return closest ? closest.o : null;
+                };
+
+                const currentPrice = token.stats.p;
+                const o1 = getOpenAt(60000);
+                if (o1) token.stats.c1 = ((currentPrice - o1) / o1) * 100;
+                const o3 = getOpenAt(180000);
+                if (o3) token.stats.c3 = ((currentPrice - o3) / o3) * 100;
+                const o15 = getOpenAt(900000);
+                if (o15) token.stats.c15 = ((currentPrice - o15) / o15) * 100;
+
+                let v1 = 0, v5 = 0, b5 = 0, n5 = 0;
+                for (const [t, k] of token.klineMap) {
+                    const age = now - t;
+                    if (age > 300000) continue;
+                    const calcVol = k.v * k.c;
+                    const vol = (k.q === 0 || k.q < calcVol * 0.5) ? calcVol : k.q;
+                    let buyVol = 0;
+                    if (k.c > k.o) buyVol = vol;
+                    else if (k.c === k.o) buyVol = vol * 0.5;
+
+                    v5 += vol; b5 += buyVol; n5 += k.n;
+                    if (age < 60000) v1 += vol;
+                }
+                token.stats.v1 = v1;
+                token.stats.v5 = v5;
+                token.stats.n = n5;
+                token.stats.r = v5 > 0 ? (b5 / v5) * 100 : 50;
+            }
+
+            checkAlert(token) {
+                if (Date.now() - token.lastAlert < 120000) return;
+                const s = token.stats;
+                const cfgC1 = parseFloat(document.getElementById('cfg-chg1').value) || 2.0;
+                const cfgC3 = parseFloat(document.getElementById('cfg-chg3').value) || 6.0;
+                const cfgC15 = parseFloat(document.getElementById('cfg-chg15').value) || 10.0;
+                const cfgVol = (parseFloat(document.getElementById('cfg-vol').value) || 0) * 1000;
+                const cfgTrd = parseFloat(document.getElementById('cfg-trades').value) || 0;
+                const repeatCount = parseInt(document.getElementById('cfg-repeat').value) || 3;
+                const onlyUp = document.getElementById('cfg-only-up').checked;
+
+                if (s.v1 < cfgVol || s.n < cfgTrd) return;
+                if (onlyUp && s.c1 < 0 && s.c3 < 0 && s.c15 < 0) return;
+
+                let type = null;
+                let msg = '';
+                // 优先级：3m 暴涨 > 15m 大涨 > 1m 启动
+                if (s.c3 >= cfgC3) { type = 'pump'; msg = `暴涨 百分之${s.c3.toFixed(1)}`; }
+                else if (s.c15 >= cfgC15) { type = 'pump'; msg = `大涨15分 百分之${s.c15.toFixed(1)}`; }
+                else if (s.c1 >= cfgC1) { type = 'pump'; msg = `上涨 百分之${s.c1.toFixed(1)}`; }
+
+                if (type) {
+                    token.lastAlert = Date.now();
+                    token.highlightUntil = Date.now() + 30000;
+                    this.audio.trigger(type, token.meta.symbol, msg, repeatCount);
+                    
+                    const color = type === 'pump' ? 'text-highlight' : 'text-up';
+                    const badge = type === 'pump' ? '🚀' : '⚠️';
+                    const timeStr = new Date().toLocaleTimeString('en-GB');
+                    
+                    const logHtml = `
+                        <div class="mb-1 p-2 bg-white/5 rounded border-l-2 ${type==='pump'?'border-highlight':'border-up'} hover:bg-white/10 transition cursor-pointer" onclick="window.open('${this.getLink(token)}')">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="font-bold text-white text-sm hover:text-highlight underline decoration-dotted">${token.meta.symbol}</span>
+                                <span class="text-[10px] text-gray-500 font-mono">${timeStr}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs ${color}">${badge} ${msg}</span>
+                                <span class="text-xxs text-gray-500">1m $:${(s.v1/1000).toFixed(1)}K</span>
+                            </div>
+                        </div>`;
+                    this.dom.logs.insertAdjacentHTML('afterbegin', logHtml);
+                }
+            }
+
+            render(list) {
+                this.lastRenderList = list; 
+                list.sort((a, b) => {
+                    if (a.isPinned && !b.isPinned) return -1;
+                    if (!a.isPinned && b.isPinned) return 1;
+                    return (a.stats[this.sortKey] - b.stats[this.sortKey]) * this.sortDir;
+                });
+
+                const cfgVol = (parseFloat(document.getElementById('cfg-vol').value) || 0) * 1000;
+                const cfgTrd = parseFloat(document.getElementById('cfg-trades').value) || 0;
+                const now = Date.now();
+
+                let html = '';
+                list.forEach((t, idx) => {
+                    const s = t.stats;
+                    const isLocked = t.highlightUntil && now < t.highlightUntil;
+                    const isQualified = s.v1 >= cfgVol && s.n >= cfgTrd;
+                    let rowClass = 'border-b border-[#1e2329] transition-all duration-200';
+                    
+                    if (t.isPinned) rowClass += ' pinned-row';
+                    else if (isLocked) rowClass += ' highlight-lock'; 
+                    else if (t.skipCounter > 0) rowClass += ' opacity-20 grayscale'; 
+                    else if (!isQualified) rowClass += ' dimmed hover:opacity-100';
+                    else rowClass += ' hover:bg-[#1e2329]';
+
+                    const c1Color = s.c1 > 0 ? 'text-up' : (s.c1 < 0 ? 'text-down' : 'text-gray-500');
+                    const c3Color = s.c3 > 0 ? 'text-up' : (s.c3 < 0 ? 'text-down' : 'text-gray-500');
+                    const c15Color = s.c15 > 0 ? 'text-up' : (s.c15 < 0 ? 'text-down' : 'text-gray-500');
+                    const v1Color = s.v1 > 5000 ? 'text-highlight font-bold' : 'text-gray-300'; 
+                    let barColor = 'bg-gray-600';
+                    if(s.r >= 70) barColor = 'bg-up'; else if(s.r <= 30) barColor = 'bg-down';
+                    let signal = (s.r >= 70 && s.v1 > 2000) ? 'text-up' : '';
+                    const pinClass = t.isPinned ? 'text-highlight' : 'text-gray-700 hover:text-gray-400';
+
+                    html += `
+                    <tr class="${rowClass}">
+                        <td class="text-left pl-4 font-bold flex items-center gap-2">
+                            <button onclick="app.togglePin('${t.meta.alphaId}')" class="p-1 transition pin-btn" title="顶置/取消">
+                                <i class="fas fa-thumbtack ${pinClass} text-xs"></i>
+                            </button>
+                            <span class="text-[9px] text-gray-600 w-4 inline-block text-right">${idx+1}</span>
+                            <div class="flex flex-col">
+                                <a href="${this.getLink(t)}" target="_blank" class="text-white coin-link leading-none">${t.meta.symbol}</a>
+                                <span class="text-[8px] text-gray-500 font-sans leading-none mt-0.5">${t.meta.chainName}</span>
+                            </div>
+                        </td>
+                        <td class="font-mono text-white tracking-tight">${s.p < 1 ? s.p.toFixed(6) : s.p.toFixed(2)}</td>
+                        <td class="font-mono font-bold ${c1Color}">${s.c1 > 0 ? '+' : ''}${s.c1.toFixed(2)}%</td>
+                        <td class="font-mono font-bold ${c3Color}">${s.c3 > 0 ? '+' : ''}${s.c3.toFixed(2)}%</td>
+                        <td class="font-mono font-bold ${c15Color}">${s.c15 > 0 ? '+' : ''}${s.c15.toFixed(2)}%</td>
+                        <td class="font-mono">
+                            <div class="flex items-center justify-end gap-2">
+                                <span class="${signal}">${s.r.toFixed(0)}%</span>
+                                <div class="buy-ratio-bg"><div class="buy-ratio-fill ${barColor}" style="width:${s.r}%"></div></div>
+                            </div>
+                        </td>
+                        <td class="font-mono ${v1Color}">${(s.v1/1000).toFixed(1)}K</td>
+                        <td class="font-mono text-gray-500">${(s.v5/1000).toFixed(1)}K</td>
+                        <td class="font-mono text-subtext">${s.n}</td>
+                    </tr>`;
+                });
+                this.dom.body.innerHTML = html;
+            }
+
+            getLink(token) {
+                const chainSlug = token.meta.chainName ? token.meta.chainName.toLowerCase().replace(/\s+/g, '-') : 'unknown';
+                return `https://www.binance.com/zh-CN/alpha/${chainSlug}/${token.meta.contractAddress}`;
+            }
+
+            calcChg(h, now, s) {
+                const ref = h.find(x => x.t >= now - s * 1000);
+                return ref ? ((h[h.length - 1].p - ref.p) / ref.p) * 100 : 0;
+            }
+            sort(key) {
+                if (this.sortKey === key) this.sortDir *= -1; else { this.sortKey = key; this.sortDir = -1; }
+                document.querySelectorAll('th').forEach(th => th.classList.remove('active-sort'));
+                document.getElementById('th-'+key)?.classList.add('active-sort');
+            }
+        }
+
+        const app = new Terminal();
+        document.getElementById('btn-toggle').onclick = () => app.toggle();
+        document.getElementById('btn-reset').onclick = () => app.resetData();
+        document.getElementById('clear-logs').onclick = () => document.getElementById('console-logs').innerHTML = '';
+    </script>
+</body>
+</html>
