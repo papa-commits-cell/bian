@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Binance Alpha V45 [15m报警增强版]</title>
+    <title>Binance Alpha V88 [Background ID]</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -29,21 +29,24 @@
         tr:hover { background-color: #2b3139; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-thumb { background: #474d57; border-radius: 2px; }
-        .input-dark { background: #0b0e11; border: 1px solid #2b3139; color: #eaecef; padding: 4px 2px; font-size: 12px; border-radius: 3px; width: 100%; transition: border 0.2s; text-align: center; font-weight: bold; }
+        .input-dark { background: #0b0e11; border: 1px solid #2b3139; color: #eaecef; padding: 4px 8px; font-size: 12px; border-radius: 3px; width: 100%; transition: border 0.2s; text-align: center; font-weight: bold; }
         .input-dark:focus { border-color: #f0b90b; outline: none; background: #1e2329; }
-        .input-highlight { border-color: #f0b90b; color: #f0b90b; background: rgba(240, 185, 11, 0.05); }
-        .input-highlight:focus { background: rgba(240, 185, 11, 0.1); box-shadow: 0 0 5px rgba(240, 185, 11, 0.3); }
         .toggle-checkbox:checked { right: 0; border-color: #f0b90b; }
-        .toggle-checkbox:checked + .toggle-label { background-color: #f0b90b; }
         .coin-link:hover { color: #f0b90b; text-decoration: underline; }
         .dimmed { opacity: 0.3; filter: grayscale(100%); transition: opacity 0.5s; }
+        /* 置顶样式优化 */
+        .pinned-row { background-color: rgba(59, 130, 246, 0.08) !important; border-left: 4px solid #3b82f6 !important; }
+        .pinned-icon { color: #3b82f6; cursor: pointer; transition: transform 0.2s; }
+        .pinned-icon:hover { transform: scale(1.2); color: #60a5fa; }
+        .unpinned-icon { color: #4b5563; cursor: pointer; transition: color 0.2s; }
+        .unpinned-icon:hover { color: #9ca3af; }
+        
         .highlight-lock { background-color: rgba(240, 185, 11, 0.15) !important; border-left: 4px solid #f0b90b !important; opacity: 1 !important; filter: none !important; }
-        .pinned-row { background-color: rgba(59, 130, 246, 0.1) !important; border-left: 4px solid #3b82f6 !important; }
         .param-group { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; border: 1px solid #2b3139; white-space: nowrap; }
         .param-label { font-size: 0.7rem; color: #848e9c; text-transform: uppercase; font-weight: 600; }
-        .buy-ratio-bg { background: #2b3139; height: 4px; width: 40px; display: inline-block; border-radius: 2px; overflow: hidden; vertical-align: middle; }
-        .buy-ratio-fill { height: 100%; transition: width 0.3s; }
-        .pin-btn:hover { color: #f0b90b; transform: scale(1.1); }
+        /* 进度条样式调整 */
+        .heat-bg { background: #2b3139; height: 4px; width: 50px; display: inline-block; border-radius: 2px; overflow: hidden; vertical-align: middle; }
+        .heat-fill { height: 100%; transition: width 0.5s linear; }
     </style>
 </head>
 <body class="h-screen flex flex-col select-none">
@@ -51,30 +54,34 @@
     <header class="h-16 bg-panel border-b border-border flex items-center px-4 justify-between shrink-0 z-20 shadow-lg">
         <div class="flex items-center gap-6 overflow-x-auto no-scrollbar w-full mr-4">
             <div class="flex items-center gap-2 mr-2 shrink-0">
-                <i class="fas fa-bell text-highlight text-lg"></i>
-                <h1 class="font-bold text-base tracking-wider font-mono hidden lg:block">ALPHA<span class="text-highlight">V45</span></h1>
+                <i class="fas fa-fire text-accent text-lg"></i>
+                <h1 class="font-bold text-base tracking-wider font-mono hidden lg:block">ALPHA<span class="text-accent">V88</span></h1>
             </div>
             
             <div class="flex gap-3">
                 <div class="param-group" title="只监控涨跌幅最大的前N个币">
                     <span class="param-label">Top N</span>
-                    <input type="number" id="cfg-limit" value="450" min="10" max="1000" class="input-dark w-16 text-highlight text-sm" onchange="app.saveSettings()">
+                    <input type="number" id="cfg-limit" value="120" min="10" max="1000" class="input-dark w-16 text-highlight text-sm">
                 </div>
                 <div class="param-group" title="每轮扫描后的休息时间">
                     <span class="param-label">间隔(s)</span>
-                    <input type="number" id="cfg-interval" value="3" min="0" max="60" class="input-dark w-16 text-white text-sm" onchange="app.saveSettings()">
+                    <input type="number" id="cfg-interval" value="3" min="0" max="60" class="input-dark w-12 text-white text-sm">
                 </div>
                 <div class="param-group" title="每次并发请求的数量">
                     <span class="param-label">吞吐量</span>
-                    <input type="number" id="cfg-batch" value="30" min="5" max="100" class="input-dark w-16 text-accent text-sm" onchange="app.saveSettings()">
+                    <input type="number" id="cfg-batch" value="30" min="5" max="100" class="input-dark w-12 text-accent text-sm">
+                </div>
+                <div class="param-group border-l-2 border-l-blue-500/50" title="警报触发后自动置顶的时间，再次触发会累加">
+                    <span class="param-label text-blue-400">自动顶置(m)</span>
+                    <input type="number" id="cfg-pin-dur" value="10" min="1" max="600" class="input-dark w-14 text-blue-400 text-sm font-bold">
                 </div>
                 <div class="param-group" title="警报重复播放次数">
                     <span class="param-label text-highlight">播报次数</span>
-                    <input type="number" id="cfg-repeat" value="3" min="1" max="20" class="input-dark w-14 text-highlight text-sm text-center font-bold" onchange="app.saveSettings()">
+                    <input type="number" id="cfg-repeat" value="3" min="1" max="20" class="input-dark w-12 text-highlight text-sm text-center font-bold">
                 </div>
-                <div class="param-group border-l-2 border-l-red-500/50" title="智能跳过：价格不动且无成交量时跳过N次">
-                    <span class="param-label text-red-400">休眠</span>
-                    <input type="number" id="cfg-skip" value="10" min="0" max="50" class="input-dark w-14 text-red-400 text-sm" onchange="app.saveSettings()">
+                <div class="param-group" title="如果1m成交额为0，跳过检测N次">
+                    <span class="param-label text-red-400">0量跳过</span>
+                    <input type="number" id="cfg-skip" value="8" min="0" max="50" class="input-dark w-12 text-red-400 text-sm">
                 </div>
             </div>
         </div>
@@ -82,15 +89,9 @@
         <div class="flex items-center gap-3 shrink-0">
             <div class="text-xxs text-subtext hidden xl:block text-right leading-tight font-mono">
                 <div>LATENCY: <span id="stat-latency" class="text-up">--</span></div>
-                <div>SKIPPED: <span id="stat-skipped" class="text-gray-500">0</span></div>
+                <div>SKIPPED: <span id="stat-skipped" class="text-red-400">0</span></div>
             </div>
-            
             <div id="status-badge" class="px-3 py-1 bg-red-900/30 border border-red-700 rounded text-xs text-red-500 font-mono uppercase font-bold">STOPPED</div>
-            
-            <button id="btn-reset" class="bg-gray-700 hover:bg-red-600 text-white font-bold px-3 py-1.5 rounded text-sm flex items-center gap-2 transition-all shadow-lg" title="清空所有数据重新扫描">
-                <i class="fas fa-trash-can"></i>
-            </button>
-
             <button id="btn-toggle" class="bg-highlight hover:bg-yellow-400 text-black font-bold px-6 py-1.5 rounded text-sm flex items-center gap-2 transition-all active:scale-95 shadow-lg">
                 <i class="fas fa-play"></i>
             </button>
@@ -103,28 +104,29 @@
                 <div class="border-l-2 border-l-gray-600 pl-3">
                     <div class="text-xs text-gray-400 font-bold mb-3 uppercase tracking-wide">警报筛选 (FILTERS)</div>
                     <div class="space-y-3">
-                        <div class="grid grid-cols-3 gap-2">
+                        <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="text-xxs text-subtext block mb-1">1m %</label>
-                                <input type="number" id="cfg-chg1" value="2" step="0.1" class="input-dark bg-opacity-20" onchange="app.saveSettings()">
+                                <label class="text-xxs text-subtext block mb-1">1m 涨幅%</label>
+                                <input type="number" id="cfg-chg1" value="2" step="0.1" class="input-dark bg-opacity-20">
                             </div>
                             <div>
-                                <label class="text-xxs text-subtext block mb-1">3m %</label>
-                                <input type="number" id="cfg-chg3" value="6" step="0.1" class="input-dark bg-opacity-20" onchange="app.saveSettings()">
-                            </div>
-                            <div>
-                                <label class="text-xxs text-highlight font-bold block mb-1">15m %</label>
-                                <input type="number" id="cfg-chg15" value="10" step="0.5" class="input-dark input-highlight" onchange="app.saveSettings()">
+                                <label class="text-xxs text-subtext block mb-1">3m 涨幅%</label>
+                                <input type="number" id="cfg-chg3" value="6" step="0.1" class="input-dark bg-opacity-20">
                             </div>
                         </div>
+                        <div>
+                            <label class="text-xxs text-accent font-bold block mb-1">15m 涨幅% (NEW)</label>
+                            <input type="number" id="cfg-chg15" value="8.8" step="0.1" class="input-dark bg-opacity-20 text-accent">
+                        </div>
+
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="text-xxs text-highlight font-bold block mb-1">Min 1m额(K)</label>
-                                <input type="number" id="cfg-vol" value="0.5" class="input-dark input-highlight text-right" title="0.5 = 500U" onchange="app.saveSettings()">
+                                <input type="number" id="cfg-vol" value="1" class="input-dark input-highlight text-right" title="只过滤1分钟内的USDT成交额">
                             </div>
                             <div>
                                 <label class="text-xxs text-subtext block mb-1">Min 笔数</label>
-                                <input type="number" id="cfg-trades" value="3" class="input-dark bg-opacity-20 text-right" onchange="app.saveSettings()">
+                                <input type="number" id="cfg-trades" value="3" class="input-dark bg-opacity-20 text-right">
                             </div>
                         </div>
                     </div>
@@ -132,12 +134,12 @@
 
                 <div class="flex items-center justify-between mt-2">
                     <span class="text-xs text-gray-400">只看涨 (No Dump)</span>
-                    <input type="checkbox" id="cfg-only-up" class="accent-highlight" checked onchange="app.saveSettings()">
+                    <input type="checkbox" id="cfg-only-up" class="accent-highlight" checked>
                 </div>
 
                 <div>
                     <label class="text-xxs text-subtext block mb-1">黑名单 (CSV)</label>
-                    <input type="text" id="cfg-black" value="USDC,FDUSD,TUSD" class="input-dark text-down bg-opacity-20" onchange="app.saveSettings()">
+                    <input type="text" id="cfg-black" value="USDC,FDUSD,TUSD" class="input-dark text-down bg-opacity-20">
                 </div>
             </div>
 
@@ -146,7 +148,7 @@
                     <span class="text-xxs font-mono text-subtext font-bold">⚡ ALERT FEED</span>
                     <button id="clear-logs" class="text-xxs text-subtext hover:text-white transition"><i class="fas fa-trash"></i></button>
                 </div>
-                <div id="console-logs" class="flex-1 overflow-y-auto p-2 space-y-2 font-mono text-xxs text-gray-400"></div>
+                <div id="console-logs" class="flex-1 overflow-y-auto p-2 space-y-2 font-mono text-xs text-gray-400"></div>
             </div>
         </aside>
 
@@ -159,12 +161,13 @@
                 <table class="w-full text-right border-collapse">
                     <thead>
                         <tr>
-                            <th class="text-left w-32 pl-4">币种 (Pin/Link)</th>
+                            <th class="text-center w-8 text-xs"><i class="fas fa-thumbtack"></i></th>
+                            <th class="text-left w-32">币种 (Link)</th>
                             <th onclick="app.sort('p')">价格</th>
                             <th onclick="app.sort('c1')">1m</th>
                             <th onclick="app.sort('c3')">3m</th>
-                            <th onclick="app.sort('c15')" class="text-highlight">15m</th>
-                            <th onclick="app.sort('r')">买盘%</th>
+                            <th onclick="app.sort('c15')">15m</th>
+                            <th class="text-accent">热度 (Time)</th>
                             <th onclick="app.sort('v1')" id="th-v1" class="text-highlight">1m $</th>
                             <th onclick="app.sort('v5')" id="th-v5" class="text-subtext active-sort">5m $</th>
                             <th onclick="app.sort('n')">笔数</th>
@@ -173,7 +176,7 @@
                     <tbody id="market-body"></tbody>
                 </table>
                 <div id="empty-state" class="hidden flex flex-col items-center justify-center h-64 text-subtext opacity-50">
-                    <i class="fas fa-chart-line text-4xl mb-4"></i><p class="text-xs">SYSTEM READY</p>
+                    <i class="fas fa-fire text-4xl mb-4 text-accent"></i><p class="text-xs">READY</p>
                 </div>
             </div>
         </main>
@@ -182,17 +185,51 @@
     <script>
         const API_BASE = 'https://www.binance.com/bapi/defi/v1/public';
 
+        // 本地存储管理器
+        const ConfigManager = {
+            STORAGE_KEY: 'binance_alpha_cfg_v41',
+            save() {
+                const inputs = document.querySelectorAll('input[id^="cfg-"]');
+                const settings = {};
+                inputs.forEach(input => {
+                    if(input.type === 'checkbox') settings[input.id] = input.checked;
+                    else settings[input.id] = input.value;
+                });
+                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(settings));
+            },
+            load() {
+                const saved = localStorage.getItem(this.STORAGE_KEY);
+                if (saved) {
+                    const settings = JSON.parse(saved);
+                    for (const [id, val] of Object.entries(settings)) {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            if(el.type === 'checkbox') el.checked = val;
+                            else el.value = val;
+                        }
+                    }
+                }
+            },
+            bind() {
+                document.querySelectorAll('input[id^="cfg-"]').forEach(input => {
+                    input.addEventListener('change', () => this.save());
+                });
+            }
+        };
+
         class SoundSystem {
             constructor() {
                 this.ctx = new (window.AudioContext || window.webkitAudioContext)();
                 this.enabled = false;
             }
             activate() { if (this.ctx.state === 'suspended') this.ctx.resume(); this.enabled = true; }
+            
             playTone(type) {
                 if (!this.enabled) return;
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 const now = this.ctx.currentTime;
+
                 if (type === 'pump') { 
                     osc.type = 'square'; osc.frequency.setValueAtTime(1000, now);
                     osc.frequency.linearRampToValueAtTime(1500, now + 0.15); gain.gain.setValueAtTime(0.2, now);
@@ -200,6 +237,7 @@
                 }
                 osc.connect(gain); gain.connect(this.ctx.destination);
             }
+
             speak(symbol, text) {
                 if (!this.enabled) return;
                 window.speechSynthesis.cancel();
@@ -207,10 +245,12 @@
                 u.lang = 'zh-CN'; u.rate = 1.5; u.volume = 1.0;
                 window.speechSynthesis.speak(u);
             }
+
             trigger(type, symbol, msg, count) {
                 if (!this.enabled) return;
                 this.playTone(type);
                 this.speak(symbol, msg);
+
                 if (count > 1) {
                     for (let i = 1; i < count; i++) {
                         setTimeout(() => {
@@ -226,18 +266,16 @@
             constructor() {
                 this.tokens = new Map();
                 this.pairMap = new Map();
+                this.pinned = new Map(); 
                 this.audio = new SoundSystem();
                 this.isRunning = false;
                 this.timer = null;
                 this.sortKey = 'v5';
                 this.sortDir = -1;
                 this.skippedCount = 0;
-                this.pinnedIds = new Set();
-                this.lastRenderList = [];
                 
                 this.dom = {
                     btn: document.getElementById('btn-toggle'),
-                    reset: document.getElementById('btn-reset'),
                     badge: document.getElementById('status-badge'),
                     body: document.getElementById('market-body'),
                     logs: document.getElementById('console-logs'),
@@ -248,61 +286,8 @@
                     skp: document.getElementById('stat-skipped')
                 };
 
-                this.loadSettings();
-            }
-
-            loadSettings() {
-                const saved = localStorage.getItem('alpha_cfg_v3'); // 更新到 V3 版本
-                if (saved) {
-                    const cfg = JSON.parse(saved);
-                    for (const [id, val] of Object.entries(cfg.inputs || {})) {
-                        const el = document.getElementById(id);
-                        if (el) {
-                            if (el.type === 'checkbox') el.checked = val;
-                            else el.value = val;
-                        }
-                    }
-                    if (cfg.pinned) this.pinnedIds = new Set(cfg.pinned);
-                }
-            }
-
-            saveSettings() {
-                const ids = ['cfg-limit', 'cfg-interval', 'cfg-batch', 'cfg-repeat', 'cfg-skip', 
-                             'cfg-chg1', 'cfg-chg3', 'cfg-chg15', 'cfg-vol', 'cfg-trades', 'cfg-black', 'cfg-only-up'];
-                const inputs = {};
-                ids.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) inputs[id] = el.type === 'checkbox' ? el.checked : el.value;
-                });
-                const cfg = { inputs: inputs, pinned: Array.from(this.pinnedIds) };
-                localStorage.setItem('alpha_cfg_v3', JSON.stringify(cfg));
-            }
-
-            togglePin(alphaId) {
-                if (this.pinnedIds.has(alphaId)) this.pinnedIds.delete(alphaId);
-                else this.pinnedIds.add(alphaId);
-                this.saveSettings();
-                
-                if (this.lastRenderList.length > 0) {
-                    this.lastRenderList.forEach(t => t.isPinned = this.pinnedIds.has(t.meta.alphaId));
-                    this.render(this.lastRenderList);
-                }
-            }
-
-            resetData() {
-                this.tokens.clear();
-                this.dom.body.innerHTML = '';
-                this.dom.logs.innerHTML = '';
-                this.skippedCount = 0;
-                this.dom.skp.innerText = '0';
-                this.dom.lat.innerText = '--';
-                if (this.isRunning) {
-                    this.pairMap.clear(); 
-                    this.initExchangeInfo();
-                }
-                const icon = this.dom.reset.querySelector('i');
-                icon.className = 'fas fa-check text-green-400';
-                setTimeout(() => icon.className = 'fas fa-trash-can', 1000);
+                ConfigManager.load();
+                ConfigManager.bind();
             }
 
             toggle() {
@@ -320,6 +305,16 @@
                     this.dom.empty.classList.remove('hidden');
                     clearTimeout(this.timer);
                 }
+            }
+
+            togglePin(symbol) {
+                if (this.pinned.has(symbol) && this.pinned.get(symbol) === Infinity) {
+                    this.pinned.delete(symbol);
+                } else {
+                    this.pinned.set(symbol, Infinity);
+                }
+                const currentList = Array.from(this.tokens.values()).filter(t => t.lastRendered);
+                if(currentList.length > 0) this.render(currentList);
             }
 
             updateUI(running) {
@@ -363,11 +358,12 @@
                 const now = Date.now();
                 const validTokens = [];
                 const blackList = document.getElementById('cfg-black').value.toUpperCase().split(',');
-                const scanLimit = parseInt(document.getElementById('cfg-limit').value) || 450;
+                const scanLimit = parseInt(document.getElementById('cfg-limit').value) || 360;
 
                 rawData.forEach(t => {
                     let pairs = this.pairMap.get(t.alphaId);
                     if (!pairs) pairs = [t.symbol + 'USDT']; 
+
                     if (!t.price) return; 
                     if (blackList.includes(t.symbol.toUpperCase())) return;
 
@@ -377,101 +373,112 @@
                     if (!token) {
                         token = {
                             meta: t, pairs: pairs, history: [],
-                            klineMap: new Map(),
-                            stats: { p: price, c1: 0, c3: 0, c15: 0, v1: 0, v5: 0, n: 0, r: 50 }, 
-                            lastAlert: 0, highlightUntil: 0, skipCounter: 0,
-                            hasFullHistory: false,
-                            isPinned: false
+                            volHistory: new Map(),
+                            stats: { p: price, c1: 0, c3: 0, c15: 0, v1: 0, v5: 0, n: 0 }, 
+                            lastAlert: 0, highlightUntil: 0, skipCounter: 0, lastRendered: false
                         };
                         this.tokens.set(t.alphaId, token);
                     }
 
                     token.history.push({ t: now, p: price });
                     if (token.history.length > 600) token.history.shift(); 
+                    
                     token.stats.p = price;
-                    token.isPinned = this.pinnedIds.has(t.alphaId);
-
-                    if (!token.hasFullHistory) {
-                        token.stats.c1 = this.calcChg(token.history, now, 60);
-                        token.stats.c3 = this.calcChg(token.history, now, 180);
-                    }
+                    token.stats.c1 = this.calcChg(token.history, now, 60);
+                    token.stats.c3 = this.calcChg(token.history, now, 180);
+                    token.stats.c15 = this.calcChg(token.history, now, 900);
+                    
                     validTokens.push(token);
                 });
 
-                validTokens.sort((a, b) => {
-                    const scoreA = Math.abs(a.stats.c1) * 5 + Math.abs(a.stats.c3);
-                    const scoreB = Math.abs(b.stats.c1) * 5 + Math.abs(b.stats.c3);
-                    return scoreB - scoreA;
+                const targets = validTokens.sort((a, b) => Math.abs(b.stats.c3) - Math.abs(a.stats.c3)).slice(0, scanLimit);
+                
+                this.pinned.forEach((expire, symbol) => {
+                    if (expire === Infinity || expire > now) {
+                        const pinnedToken = validTokens.find(t => t.meta.symbol === symbol);
+                        if (pinnedToken && !targets.includes(pinnedToken)) {
+                            targets.push(pinnedToken);
+                        }
+                    } else {
+                        this.pinned.delete(symbol);
+                    }
                 });
 
-                const targets = [];
+                const toFetch = [];
                 this.skippedCount = 0;
 
-                for (const t of validTokens) {
-                    if (targets.length >= scanLimit && !t.isPinned) break;
-
-                    const isWakingUp = Math.abs(t.stats.c1) > 0.5;
-                    if (t.isPinned || isWakingUp) {
+                targets.forEach(t => {
+                    const isPinned = this.pinned.has(t.meta.symbol);
+                    
+                    if (isPinned || Math.abs(t.stats.c3) > 2.0 || Math.abs(t.stats.c15) > 5.0) {
                         t.skipCounter = 0;
-                        targets.push(t);
+                        toFetch.push(t);
+                    } 
+                    else if (t.skipCounter > 0) {
+                        t.skipCounter--;
+                        this.skippedCount++;
                     } else {
-                        if (t.skipCounter > 0) {
-                            t.skipCounter--;
-                            this.skippedCount++;
-                        } else {
-                            targets.push(t);
-                        }
+                        toFetch.push(t);
                     }
-                }
+                });
 
                 this.dom.skp.innerText = this.skippedCount;
-                await this.fetchKlinesBatch(targets);
                 
-                let displayList = validTokens.slice(0, scanLimit);
-                const pinnedExtras = validTokens.filter(t => t.isPinned && !displayList.includes(t));
-                displayList = [...displayList, ...pinnedExtras];
-                
-                this.render(displayList);
+                await this.fetchKlinesBatch(toFetch);
+                this.render(targets);
             }
 
             async fetchKlinesBatch(targets) {
                 const BATCH_SIZE = parseInt(document.getElementById('cfg-batch').value) || 30; 
-                const SKIP_RESET = parseInt(document.getElementById('cfg-skip').value) || 10;
+                const SKIP_RESET = parseInt(document.getElementById('cfg-skip').value) || 11;
                 let completed = 0;
 
                 for (let i = 0; i < targets.length; i += BATCH_SIZE) {
                     if (!this.isRunning) break;
-                    if (i > 0) await new Promise(r => setTimeout(r, 200));
-
+                    
                     const batch = targets.slice(i, i + BATCH_SIZE);
                     const promises = batch.map(async (token) => {
                         try {
-                            const limit = token.hasFullHistory ? 5 : 60;
-                            const res = await fetch(`${API_BASE}/alpha-trade/klines?symbol=${token.pairs[0]}&interval=15s&limit=${limit}&_t=${Date.now()}`);
+                            const res = await fetch(`${API_BASE}/alpha-trade/klines?symbol=${token.pairs[0]}&interval=15s&limit=20&_t=${Date.now()}`);
                             const d = await res.json();
-                            
-                            if (d.data && d.data.length > 0) {
+                            if (d.data) {
                                 d.data.forEach(k => {
-                                    token.klineMap.set(k[0], { 
-                                        t: k[0], o: parseFloat(k[1]), c: parseFloat(k[4]), 
-                                        v: parseFloat(k[5]), q: parseFloat(k[7]), n: parseInt(k[8]) 
-                                    });
+                                    const t = k[0]; 
+                                    const open = parseFloat(k[1]);
+                                    const close = parseFloat(k[4]);
+                                    const baseVol = parseFloat(k[5]);
+                                    const quoteVol = parseFloat(k[7]);
+                                    const calcVol = baseVol * close; 
+                                    const vol = (quoteVol === 0 || quoteVol < calcVol * 0.5) ? calcVol : quoteVol;
+                                    const trades = parseInt(k[8]);
+                                    token.volHistory.set(t, { v: vol, n: trades });
                                 });
-
-                                const expireTime = Date.now() - 16 * 60 * 1000;
-                                for (const [t, _] of token.klineMap) {
-                                    if (t < expireTime) token.klineMap.delete(t);
-                                }
-                                token.hasFullHistory = true;
-                                this.calcStatsFromMap(token);
                             }
                         } catch (e) {}
 
-                        if (!token.isPinned && token.stats.v1 === 0 && Math.abs(token.stats.c1) < 0.3) {
-                            token.skipCounter = SKIP_RESET;
+                        const now = Date.now();
+                        let v1 = 0, v5 = 0;
+                        let n5 = 0; 
+                        
+                        for (const [t, val] of token.volHistory) {
+                            if (now - t > 360000) {
+                                token.volHistory.delete(t);
+                                continue;
+                            }
+                            const age = now - t;
+                            if (age < 300000) { v5 += val.v; n5 += val.n; }
+                            if (age < 60000) v1 += val.v;
                         }
+                        
+                        token.stats.v5 = v5;
+                        token.stats.v1 = v1;
+                        token.stats.n = n5;
+
+                        if (v1 === 0 && !this.pinned.has(token.meta.symbol)) token.skipCounter = SKIP_RESET;
+
                         this.checkAlert(token);
                     });
+
                     await Promise.all(promises);
                     completed += batch.length;
                     this.dom.bar.style.width = Math.round((completed / targets.length) * 100) + '%';
@@ -479,58 +486,32 @@
                 setTimeout(() => { this.dom.bar.style.width = '0%'; }, 200);
             }
 
-            calcStatsFromMap(token) {
-                const now = Date.now();
-                const getOpenAt = (msAgo) => {
-                    const targetTime = now - msAgo;
-                    let closest = null;
-                    let minDiff = Infinity;
-                    for (const [t, k] of token.klineMap) {
-                        const diff = Math.abs(t - targetTime);
-                        if (diff < minDiff && diff < 60000) {
-                            minDiff = diff;
-                            closest = k;
-                        }
-                    }
-                    return closest ? closest.o : null;
-                };
-
-                const currentPrice = token.stats.p;
-                const o1 = getOpenAt(60000);
-                if (o1) token.stats.c1 = ((currentPrice - o1) / o1) * 100;
-                const o3 = getOpenAt(180000);
-                if (o3) token.stats.c3 = ((currentPrice - o3) / o3) * 100;
-                const o15 = getOpenAt(900000);
-                if (o15) token.stats.c15 = ((currentPrice - o15) / o15) * 100;
-
-                let v1 = 0, v5 = 0, b5 = 0, n5 = 0;
-                for (const [t, k] of token.klineMap) {
-                    const age = now - t;
-                    if (age > 300000) continue;
-                    const calcVol = k.v * k.c;
-                    const vol = (k.q === 0 || k.q < calcVol * 0.5) ? calcVol : k.q;
-                    let buyVol = 0;
-                    if (k.c > k.o) buyVol = vol;
-                    else if (k.c === k.o) buyVol = vol * 0.5;
-
-                    v5 += vol; b5 += buyVol; n5 += k.n;
-                    if (age < 60000) v1 += vol;
+            // 生成唯一的币种背景色和边框色 (基于名称Hash，确定性算法)
+            getSymbolColor(symbol) {
+                let hash = 0;
+                for (let i = 0; i < symbol.length; i++) {
+                    hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
                 }
-                token.stats.v1 = v1;
-                token.stats.v5 = v5;
-                token.stats.n = n5;
-                token.stats.r = v5 > 0 ? (b5 / v5) * 100 : 50;
+                const h = Math.abs(hash) % 360;
+                // 背景色：低亮度(15%)，高饱和度，透明度0.9，确保文字可读
+                // 边框色：高亮度(60%)，作为识别色
+                return {
+                    bg: `hsla(${h}, 70%, 15%, 0.9)`,
+                    border: `hsl(${h}, 80%, 60%)`
+                };
             }
 
             checkAlert(token) {
                 if (Date.now() - token.lastAlert < 120000) return;
+
                 const s = token.stats;
                 const cfgC1 = parseFloat(document.getElementById('cfg-chg1').value) || 2.0;
                 const cfgC3 = parseFloat(document.getElementById('cfg-chg3').value) || 6.0;
-                const cfgC15 = parseFloat(document.getElementById('cfg-chg15').value) || 10.0;
+                const cfgC15 = parseFloat(document.getElementById('cfg-chg15').value) || 8.8;
                 const cfgVol = (parseFloat(document.getElementById('cfg-vol').value) || 0) * 1000;
                 const cfgTrd = parseFloat(document.getElementById('cfg-trades').value) || 0;
                 const repeatCount = parseInt(document.getElementById('cfg-repeat').value) || 3;
+                const pinDurationMin = parseFloat(document.getElementById('cfg-pin-dur').value) || 10;
                 const onlyUp = document.getElementById('cfg-only-up').checked;
 
                 if (s.v1 < cfgVol || s.n < cfgTrd) return;
@@ -538,29 +519,63 @@
 
                 let type = null;
                 let msg = '';
-                // 优先级：3m 暴涨 > 15m 大涨 > 1m 启动
-                if (s.c3 >= cfgC3) { type = 'pump'; msg = `暴涨 百分之${s.c3.toFixed(1)}`; }
-                else if (s.c15 >= cfgC15) { type = 'pump'; msg = `大涨15分 百分之${s.c15.toFixed(1)}`; }
-                else if (s.c1 >= cfgC1) { type = 'pump'; msg = `上涨 百分之${s.c1.toFixed(1)}`; }
+
+                if (s.c3 >= cfgC3) {
+                    type = 'pump'; msg = `暴涨 百分之${s.c3.toFixed(1)}`;
+                } else if (s.c1 >= cfgC1) {
+                    type = 'pump'; msg = `上涨 百分之${s.c1.toFixed(1)}`;
+                } else if (s.c15 >= cfgC15) {
+                    type = 'pump'; msg = `趋势 百分之${s.c15.toFixed(1)}`; 
+                }
 
                 if (type) {
                     token.lastAlert = Date.now();
                     token.highlightUntil = Date.now() + 30000;
-                    this.audio.trigger(type, token.meta.symbol, msg, repeatCount);
+                    
+                    const symbol = token.meta.symbol;
+                    const addTime = pinDurationMin * 60 * 1000;
+                    const now = Date.now();
+                    let currentExpire = this.pinned.get(symbol);
+
+                    if (currentExpire !== Infinity) {
+                        if (!currentExpire || currentExpire < now) {
+                            this.pinned.set(symbol, now + addTime);
+                        } else {
+                            this.pinned.set(symbol, currentExpire + addTime);
+                        }
+                    }
+                    
+                    this.audio.trigger(type, symbol, msg, repeatCount);
                     
                     const color = type === 'pump' ? 'text-highlight' : 'text-up';
                     const badge = type === 'pump' ? '🚀' : '⚠️';
                     const timeStr = new Date().toLocaleTimeString('en-GB');
+                    const priceStr = s.p < 1 ? s.p.toFixed(6) : s.p.toFixed(2);
+                    
+                    // 获取币种专属颜色配置
+                    const colors = this.getSymbolColor(symbol);
                     
                     const logHtml = `
-                        <div class="mb-1 p-2 bg-white/5 rounded border-l-2 ${type==='pump'?'border-highlight':'border-up'} hover:bg-white/10 transition cursor-pointer" onclick="window.open('${this.getLink(token)}')">
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="font-bold text-white text-sm hover:text-highlight underline decoration-dotted">${token.meta.symbol}</span>
-                                <span class="text-[10px] text-gray-500 font-mono">${timeStr}</span>
+                        <div class="mb-2 p-2 rounded border-l-4 transition relative group select-text shadow-lg"
+                             style="background: ${colors.bg}; border-left-color: ${colors.border};">
+                            <div class="flex justify-between items-start">
+                                <div class="flex flex-col cursor-pointer" onclick="window.open('${this.getLink(token)}')">
+                                    <div class="flex items-baseline gap-2">
+                                        <span class="text-sm font-black tracking-wide text-white hover:brightness-125 transition">${token.meta.symbol}</span>
+                                        <span class="text-xs text-gray-300 font-mono">${priceStr}</span>
+                                    </div>
+                                    <div class="mt-1">
+                                         <span class="text-xs ${color} font-bold mix-blend-plus-lighter">${badge} ${msg}</span>
+                                    </div>
+                                </div>
+                                <button onclick="event.stopPropagation(); app.togglePin('${token.meta.symbol}')" 
+                                        class="w-8 h-8 flex items-center justify-center rounded bg-black/40 hover:bg-white/20 text-gray-300 hover:text-white transition shadow-sm border border-white/10 ml-2 shrink-0 backdrop-blur-sm" 
+                                        title="置顶监控">
+                                    <i class="fas fa-thumbtack text-xs"></i>
+                                </button>
                             </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs ${color}">${badge} ${msg}</span>
-                                <span class="text-xxs text-gray-500">1m $:${(s.v1/1000).toFixed(1)}K</span>
+                            <div class="flex justify-end items-center mt-2 border-t border-white/10 pt-1">
+                                <span class="text-[11px] text-white font-mono font-bold tracking-wide drop-shadow-md">${timeStr}</span>
                             </div>
                         </div>`;
                     this.dom.logs.insertAdjacentHTML('afterbegin', logHtml);
@@ -568,25 +583,41 @@
             }
 
             render(list) {
-                this.lastRenderList = list; 
+                const now = Date.now();
+                list.forEach(t => t.lastRendered = true);
+                
                 list.sort((a, b) => {
-                    if (a.isPinned && !b.isPinned) return -1;
-                    if (!a.isPinned && b.isPinned) return 1;
+                    const symA = a.meta.symbol;
+                    const symB = b.meta.symbol;
+                    
+                    const pinA = this.pinned.get(symA) || 0;
+                    const pinB = this.pinned.get(symB) || 0;
+                    
+                    const isPinA = pinA === Infinity || pinA > now;
+                    const isPinB = pinB === Infinity || pinB > now;
+
+                    if (isPinA && !isPinB) return -1;
+                    if (!isPinA && isPinB) return 1;
+
+                    if (isPinA && isPinB) return pinB - pinA;
+
                     return (a.stats[this.sortKey] - b.stats[this.sortKey]) * this.sortDir;
                 });
 
                 const cfgVol = (parseFloat(document.getElementById('cfg-vol').value) || 0) * 1000;
                 const cfgTrd = parseFloat(document.getElementById('cfg-trades').value) || 0;
-                const now = Date.now();
+                const cfgPinDur = (parseFloat(document.getElementById('cfg-pin-dur').value) || 10) * 60 * 1000;
 
                 let html = '';
                 list.forEach((t, idx) => {
                     const s = t.stats;
                     const isLocked = t.highlightUntil && now < t.highlightUntil;
+                    const pinExpire = this.pinned.get(t.meta.symbol);
+                    const isPinned = pinExpire === Infinity || (pinExpire && pinExpire > now);
                     const isQualified = s.v1 >= cfgVol && s.n >= cfgTrd;
-                    let rowClass = 'border-b border-[#1e2329] transition-all duration-200';
                     
-                    if (t.isPinned) rowClass += ' pinned-row';
+                    let rowClass = 'border-b border-[#1e2329] transition-all duration-200';
+                    if (isPinned) rowClass += ' pinned-row'; 
                     else if (isLocked) rowClass += ' highlight-lock'; 
                     else if (t.skipCounter > 0) rowClass += ' opacity-20 grayscale'; 
                     else if (!isQualified) rowClass += ' dimmed hover:opacity-100';
@@ -596,32 +627,48 @@
                     const c3Color = s.c3 > 0 ? 'text-up' : (s.c3 < 0 ? 'text-down' : 'text-gray-500');
                     const c15Color = s.c15 > 0 ? 'text-up' : (s.c15 < 0 ? 'text-down' : 'text-gray-500');
                     const v1Color = s.v1 > 5000 ? 'text-highlight font-bold' : 'text-gray-300'; 
-                    let barColor = 'bg-gray-600';
-                    if(s.r >= 70) barColor = 'bg-up'; else if(s.r <= 30) barColor = 'bg-down';
-                    let signal = (s.r >= 70 && s.v1 > 2000) ? 'text-up' : '';
-                    const pinClass = t.isPinned ? 'text-highlight' : 'text-gray-700 hover:text-gray-400';
+                    
+                    let pinIconClass = isPinned ? 'fas fa-thumbtack pinned-icon' : 'fas fa-thumbtack unpinned-icon text-opacity-20';
+                    let pinTitle = isPinned ? (pinExpire === Infinity ? '手动置顶' : `剩余 ${(pinExpire - now)/60000 | 0} 分钟`) : '点击置顶';
+
+                    let heatHtml = '';
+                    if (isPinned) {
+                        if (pinExpire === Infinity) {
+                            heatHtml = `
+                                <div class="flex items-center justify-end gap-2">
+                                    <span class="text-xs font-bold text-accent tracking-wider">LOCK</span>
+                                    <div class="heat-bg"><div class="heat-fill bg-accent" style="width:100%"></div></div>
+                                </div>`;
+                        } else {
+                            const left = Math.max(0, pinExpire - now);
+                            const percent = Math.min(100, (left / cfgPinDur) * 100);
+                            const minDisplay = (left / 60000).toFixed(1) + 'm';
+                            heatHtml = `
+                                <div class="flex items-center justify-end gap-2">
+                                    <span class="text-xs text-blue-400 font-mono">${minDisplay}</span>
+                                    <div class="heat-bg"><div class="heat-fill bg-blue-500" style="width:${percent}%"></div></div>
+                                </div>`;
+                        }
+                    } else {
+                        heatHtml = `<span class="text-subtext text-[10px] opacity-20">-</span>`;
+                    }
 
                     html += `
                     <tr class="${rowClass}">
-                        <td class="text-left pl-4 font-bold flex items-center gap-2">
-                            <button onclick="app.togglePin('${t.meta.alphaId}')" class="p-1 transition pin-btn" title="顶置/取消">
-                                <i class="fas fa-thumbtack ${pinClass} text-xs"></i>
-                            </button>
-                            <span class="text-[9px] text-gray-600 w-4 inline-block text-right">${idx+1}</span>
-                            <div class="flex flex-col">
-                                <a href="${this.getLink(t)}" target="_blank" class="text-white coin-link leading-none">${t.meta.symbol}</a>
-                                <span class="text-[8px] text-gray-500 font-sans leading-none mt-0.5">${t.meta.chainName}</span>
-                            </div>
+                        <td class="text-center" onclick="app.togglePin('${t.meta.symbol}')" title="${pinTitle}">
+                            <i class="${pinIconClass}"></i>
+                        </td>
+                        <td class="text-left font-bold">
+                            <span class="text-[9px] text-gray-600 w-4 inline-block text-right mr-1">${idx+1}</span>
+                            <a href="${this.getLink(t)}" target="_blank" class="text-white coin-link">${t.meta.symbol}</a>
+                            <span class="text-[9px] text-gray-500 font-sans ml-1">${t.meta.chainName}</span>
                         </td>
                         <td class="font-mono text-white tracking-tight">${s.p < 1 ? s.p.toFixed(6) : s.p.toFixed(2)}</td>
                         <td class="font-mono font-bold ${c1Color}">${s.c1 > 0 ? '+' : ''}${s.c1.toFixed(2)}%</td>
                         <td class="font-mono font-bold ${c3Color}">${s.c3 > 0 ? '+' : ''}${s.c3.toFixed(2)}%</td>
                         <td class="font-mono font-bold ${c15Color}">${s.c15 > 0 ? '+' : ''}${s.c15.toFixed(2)}%</td>
                         <td class="font-mono">
-                            <div class="flex items-center justify-end gap-2">
-                                <span class="${signal}">${s.r.toFixed(0)}%</span>
-                                <div class="buy-ratio-bg"><div class="buy-ratio-fill ${barColor}" style="width:${s.r}%"></div></div>
-                            </div>
+                            ${heatHtml}
                         </td>
                         <td class="font-mono ${v1Color}">${(s.v1/1000).toFixed(1)}K</td>
                         <td class="font-mono text-gray-500">${(s.v5/1000).toFixed(1)}K</td>
@@ -649,7 +696,6 @@
 
         const app = new Terminal();
         document.getElementById('btn-toggle').onclick = () => app.toggle();
-        document.getElementById('btn-reset').onclick = () => app.resetData();
         document.getElementById('clear-logs').onclick = () => document.getElementById('console-logs').innerHTML = '';
     </script>
 </body>
